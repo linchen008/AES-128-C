@@ -139,6 +139,35 @@ void shift_rows(unsigned char *block) {
   }
 }
 
+// Function to perform Galois Field (GF) multiplication
+unsigned char galois_multiplication(unsigned char a, unsigned char b) {
+  // Initialize the product to 0
+  unsigned char p = 0;
+  // Counter to iterate over the bits of 'b'
+  unsigned char counter;
+  // Variable to store the highest bit of 'a'
+  unsigned char hi_bit_set;
+  // Loop through 8 bits (1 byte)
+  for (counter = 0; counter < 8; counter++) {
+    // if the least significant bit of 'b' is 1
+    if ((b & 1) == 1)
+      // XOR the product with 'a'
+      p ^= a;
+    // if the most significant bit of 'a' is 1
+    hi_bit_set = (a & 0x80);
+    // Left shift 'a' by 1 bit
+    a <<= 1;
+    // If the most significant bit of 'a' was 1
+    if (hi_bit_set == 0x80)
+      // XOR 'a' with the irreducible polynomial 0x1b
+      a ^= 0x1b;
+    // Right shift 'b' by 1 bit
+    b >>= 1;
+  }
+  // Return the product
+  return p;
+}
+
 /* MixColumns operates on the columns of the block,
    treating each column as a four-term polynomial and multiplying it
    with a fixed polynomial modulo a predefined polynomial.
@@ -194,35 +223,6 @@ void mixColumn(unsigned char *column) {
   column[3] =
       galois_multiplication(cpy[3], 2) ^ galois_multiplication(cpy[2], 1) ^
       galois_multiplication(cpy[1], 1) ^ galois_multiplication(cpy[0], 3);
-}
-
-// Function to perform Galois Field (GF) multiplication
-unsigned char galois_multiplication(unsigned char a, unsigned char b) {
-  // Initialize the product to 0
-  unsigned char p = 0;
-  // Counter to iterate over the bits of 'b'
-  unsigned char counter;
-  // Variable to store the highest bit of 'a'
-  unsigned char hi_bit_set;
-  // Loop through 8 bits (1 byte)
-  for (counter = 0; counter < 8; counter++) {
-    // if the least significant bit of 'b' is 1
-    if ((b & 1) == 1)
-      // XOR the product with 'a'
-      p ^= a;
-    // if the most significant bit of 'a' is 1
-    hi_bit_set = (a & 0x80);
-    // Left shift 'a' by 1 bit
-    a <<= 1;
-    // If the most significant bit of 'a' was 1
-    if (hi_bit_set == 0x80)
-      // XOR 'a' with the irreducible polynomial 0x1b
-      a ^= 0x1b;
-    // Right shift 'b' by 1 bit
-    b >>= 1;
-  }
-  // Return the product
-  return p;
 }
 
 /*
