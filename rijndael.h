@@ -1,13 +1,15 @@
 /*
  * TODO: Add your name and student number here, along with
  *       a brief description of this code.
+ * Name: Lin Chen 
+ * Number: D23125391
  */
 
 #ifndef RIJNDAEL_H
 #define RIJNDAEL_H
 
 #define BLOCK_ACCESS(block, row, col) (block[(row * 4) + col])
-#define BLOCK_SIZE 16
+#define BLOCK_SIZE 16 //16 bytes == 128 bits
 
 /*
  * These should be the main encrypt/decrypt functions (i.e. the main
