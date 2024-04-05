@@ -144,8 +144,85 @@ void shift_rows(unsigned char *block) {
    with a fixed polynomial modulo a predefined polynomial.
 */
 void mix_columns(unsigned char *block) {
-  // TODO: This function performs the MixColumns transformation during
-  // encryption.
+  // TODO: This function performs the MixColumns
+  //       transformation during encryption.
+  int i, j;
+  // Define an array to store one column of data
+  unsigned char column[4];
+
+  // Iterate over the 4 columns of the state matrix
+  for (i = 0; i < 4; i++) {
+    // Construct one column by iterating over the 4 rows
+    for (j = 0; j < 4; j++) {
+      // Fill the column array with values from the state matrix
+      column[j] = block[(j * 4) + i];
+    }
+
+    // Apply the MixColumn operation on one column
+    mixColumn(column);
+
+    // Put the values back into the state matrix
+    for (j = 0; j < 4; j++) {
+      // Update the state matrix with the modified column
+      block[(j * 4) + i] = column[j];
+    }
+  }
+}
+
+// Function to perform MixColumn operation on a single column
+void mixColumn(unsigned char *column) {
+  // Create a copy of the column
+  unsigned char cpy[4];
+  int i;
+  // Copy the values from the original column to the copy
+  for (i = 0; i < 4; i++) {
+    cpy[i] = column[i];
+  }
+  // Use Galois Field multiplication to perform the MixColumn operation
+  column[0] =
+      galois_multiplication(cpy[0], 2) ^ galois_multiplication(cpy[3], 1) ^
+      galois_multiplication(cpy[2], 1) ^ galois_multiplication(cpy[1], 3);
+
+  column[1] =
+      galois_multiplication(cpy[1], 2) ^ galois_multiplication(cpy[0], 1) ^
+      galois_multiplication(cpy[3], 1) ^ galois_multiplication(cpy[2], 3);
+
+  column[2] =
+      galois_multiplication(cpy[2], 2) ^ galois_multiplication(cpy[1], 1) ^
+      galois_multiplication(cpy[0], 1) ^ galois_multiplication(cpy[3], 3);
+
+  column[3] =
+      galois_multiplication(cpy[3], 2) ^ galois_multiplication(cpy[2], 1) ^
+      galois_multiplication(cpy[1], 1) ^ galois_multiplication(cpy[0], 3);
+}
+
+// Function to perform Galois Field (GF) multiplication
+unsigned char galois_multiplication(unsigned char a, unsigned char b) {
+  // Initialize the product to 0
+  unsigned char p = 0;
+  // Counter to iterate over the bits of 'b'
+  unsigned char counter;
+  // Variable to store the highest bit of 'a'
+  unsigned char hi_bit_set;
+  // Loop through 8 bits (1 byte)
+  for (counter = 0; counter < 8; counter++) {
+    // if the least significant bit of 'b' is 1
+    if ((b & 1) == 1)
+      // XOR the product with 'a'
+      p ^= a;
+    // if the most significant bit of 'a' is 1
+    hi_bit_set = (a & 0x80);
+    // Left shift 'a' by 1 bit
+    a <<= 1;
+    // If the most significant bit of 'a' was 1
+    if (hi_bit_set == 0x80)
+      // XOR 'a' with the irreducible polynomial 0x1b
+      a ^= 0x1b;
+    // Right shift 'b' by 1 bit
+    b >>= 1;
+  }
+  // Return the product
+  return p;
 }
 
 /*
