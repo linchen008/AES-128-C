@@ -73,29 +73,8 @@ unsigned char rsbox[256] = {
     0x55, 0x21, 0x0C, 0x7D};
 
 // Implementation: Round Constant
-unsigned char Rcon[255] = {
-    0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c,
-    0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a,
-    0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd,
-    0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a,
-    0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80,
-    0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6,
-    0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72,
-    0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc,
-    0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04, 0x08, 0x10,
-    0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e,
-    0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5,
-    0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94,
-    0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02,
-    0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d,
-    0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d,
-    0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f,
-    0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb,
-    0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c,
-    0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a,
-    0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd,
-    0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a,
-    0x74, 0xe8, 0xcb};
+unsigned char Rcon[10] = {0x8d, 0x01, 0x02, 0x04, 0x08,
+                          0x10, 0x20, 0x40, 0x80, 0x1b};
 
 /*
   Operations used when encrypting a block.
@@ -168,6 +147,33 @@ unsigned char galois_multiplication(unsigned char a, unsigned char b) {
   return p;
 }
 
+// Function to perform MixColumn operation on a single column
+void mixColumn(unsigned char *column) {
+  // Create a copy of the column
+  unsigned char cpy[4];
+  int i;
+  // Copy the values from the original column to the copy
+  for (i = 0; i < 4; i++) {
+    cpy[i] = column[i];
+  }
+  // Use Galois Field multiplication to perform the MixColumn operation
+  column[0] =
+      galois_multiplication(cpy[0], 2) ^ galois_multiplication(cpy[3], 1) ^
+      galois_multiplication(cpy[2], 1) ^ galois_multiplication(cpy[1], 3);
+
+  column[1] =
+      galois_multiplication(cpy[1], 2) ^ galois_multiplication(cpy[0], 1) ^
+      galois_multiplication(cpy[3], 1) ^ galois_multiplication(cpy[2], 3);
+
+  column[2] =
+      galois_multiplication(cpy[2], 2) ^ galois_multiplication(cpy[1], 1) ^
+      galois_multiplication(cpy[0], 1) ^ galois_multiplication(cpy[3], 3);
+
+  column[3] =
+      galois_multiplication(cpy[3], 2) ^ galois_multiplication(cpy[2], 1) ^
+      galois_multiplication(cpy[1], 1) ^ galois_multiplication(cpy[0], 3);
+}
+
 /* MixColumns operates on the columns of the block,
    treating each column as a four-term polynomial and multiplying it
    with a fixed polynomial modulo a predefined polynomial.
@@ -198,33 +204,6 @@ void mix_columns(unsigned char *block) {
   }
 }
 
-// Function to perform MixColumn operation on a single column
-void mixColumn(unsigned char *column) {
-  // Create a copy of the column
-  unsigned char cpy[4];
-  int i;
-  // Copy the values from the original column to the copy
-  for (i = 0; i < 4; i++) {
-    cpy[i] = column[i];
-  }
-  // Use Galois Field multiplication to perform the MixColumn operation
-  column[0] =
-      galois_multiplication(cpy[0], 2) ^ galois_multiplication(cpy[3], 1) ^
-      galois_multiplication(cpy[2], 1) ^ galois_multiplication(cpy[1], 3);
-
-  column[1] =
-      galois_multiplication(cpy[1], 2) ^ galois_multiplication(cpy[0], 1) ^
-      galois_multiplication(cpy[3], 1) ^ galois_multiplication(cpy[2], 3);
-
-  column[2] =
-      galois_multiplication(cpy[2], 2) ^ galois_multiplication(cpy[1], 1) ^
-      galois_multiplication(cpy[0], 1) ^ galois_multiplication(cpy[3], 3);
-
-  column[3] =
-      galois_multiplication(cpy[3], 2) ^ galois_multiplication(cpy[2], 1) ^
-      galois_multiplication(cpy[1], 1) ^ galois_multiplication(cpy[0], 3);
-}
-
 /*
  * Operations used when decrypting a block
  */
@@ -244,8 +223,16 @@ void invert_mix_columns(unsigned char *block) {
  * This operation is shared between encryption and decryption
  */
 void add_round_key(unsigned char *block, unsigned char *round_key) {
-  // TODO: Implement me!
+  // TODO: AddRoundKey XORs each byte of the block with the corresponding byte
+  // of the round key.
+  int i;
+  for (i = 0; i < BLOCK_SIZE; i++) {
+    block[i] = block[i] ^ round_key[i];
+  }
 }
+
+// Declaration of key schedule core function
+void key_schedule_core(unsigned char *word, int iteration);
 
 /*
  * This function should expand the round key. Given an input,
@@ -253,8 +240,66 @@ void add_round_key(unsigned char *block, unsigned char *round_key) {
  * vector, containing the 11 round keys one after the other
  */
 unsigned char *expand_key(unsigned char *cipher_key) {
-  // TODO: Implement me!
-  return 0;
+  // TODO: Implementation of key expansion function
+  if (cipher_key == NULL) {
+    printf("Error: Cipher key is NULL.\n");
+    return NULL;
+  }
+
+  // Memory allocation
+  unsigned char *expanded_key = malloc(EXPANDED_KEY_SIZE);
+  if (expanded_key == NULL) {
+    printf("Error: Memory allocation failed!\n");
+    return NULL;
+  }
+
+  // Copy the initial key to the beginning of the expanded key
+  memcpy(expanded_key, cipher_key, BLOCK_SIZE);
+
+  int bytes_generated = BLOCK_SIZE;  // Initial key takes 16 bytes
+  int rcon_iteration = 1;            // Round constant iteration
+
+  // Key expansion loop
+  while (bytes_generated < EXPANDED_KEY_SIZE) {
+    unsigned char temp[4];  // Temporary bytes storage
+
+    // Fetch four bytes from the previous round key as temporary bytes
+    memcpy(temp, expanded_key + bytes_generated - 4, 4);
+
+    // Perform key schedule if the boundary of each key block is reached
+    if (bytes_generated % BLOCK_SIZE == 0) {
+      // Perform key schedule
+      key_schedule_core(temp, rcon_iteration);
+      rcon_iteration++;
+    }
+
+    // Perform key expansion
+    for (int i = 0; i < 4; i++) {
+      expanded_key[bytes_generated] =
+          expanded_key[bytes_generated - BLOCK_SIZE] ^ temp[i];
+      bytes_generated++;
+    }
+  }
+  // Return the expanded key sequence
+  return expanded_key;
+}
+
+// Key schedule core function
+void key_schedule_core(unsigned char *word, int iteration) {
+  // Rotate left by one byte
+  unsigned char temp = word[0];
+  word[0] = word[1];
+  word[1] = word[2];
+  word[2] = word[3];
+  word[3] = temp;
+
+  // Substitution with S-box
+  for (int i = 0; i < 4; i++) {
+    word[i] = s_box[word[i]];
+  }
+
+  // Apply round constant
+  word[0] ^= Rcon[iteration - 1];
 }
 
 /*
