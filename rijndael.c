@@ -7,6 +7,7 @@
 
 #include <stdlib.h>  // for malloc, free
 // TODO: Any other files you need to include should go here
+#include <string.h>
 
 #include "rijndael.h"
 
@@ -48,7 +49,7 @@ unsigned char s_box[256] = {
     0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16};  // F
 
 // Implementation: Rijndael S-box
-unsigned char rsbox[256] = {
+unsigned char r_sbox[256] = {
     0x52, 0x09, 0x6A, 0xD5, 0x30, 0x36, 0xA5, 0x38, 0xBF, 0x40, 0xA3, 0x9E,
     0x81, 0xF3, 0xD7, 0xFB, 0x7C, 0xE3, 0x39, 0x82, 0x9B, 0x2F, 0xFF, 0x87,
     0x34, 0x8E, 0x43, 0x44, 0xC4, 0xDE, 0xE9, 0xCB, 0x54, 0x7B, 0x94, 0x32,
@@ -99,7 +100,7 @@ void shift_rows(unsigned char *block) {
   // TODO: This function performs the ShiftRows transformation during
   // encryption. Declare a temporary block to store intermediate results
   unsigned char temp_block[BLOCK_SIZE];
-  // Iterate over each row in the state
+  // Iterate over each row in the block
   for (int i = 0; i < BLOCK_SIZE; i += 4) {
     // Perform row shifting with diagonal effect
     // Shift the first byte in the row, no shift for the first column
@@ -116,6 +117,67 @@ void shift_rows(unsigned char *block) {
   for (int i = 0; i < BLOCK_SIZE; i++) {
     block[i] = temp_block[i];
   }
+}
+
+// Declaration of galois_multiplication function
+unsigned char galois_multiplication(unsigned char a, unsigned char b);
+// Declaration of mixColumn function
+void mixColumn(unsigned char *column);
+/* MixColumns operates on the columns of the block,
+   treating each column as a four-term polynomial and multiplying it
+   with a fixed polynomial modulo a predefined polynomial.
+*/
+void mix_columns(unsigned char *block) {
+  // TODO: This function performs the MixColumns
+  //       transformation during encryption.
+
+  // Define an array to store one column of data
+  unsigned char column[4];
+
+  // Iterate over the 4 columns of the block matrix
+  for (int i = 0; i < 4; i++) {
+    // Construct one column by iterating over the 4 rows
+    for (int j = 0; j < 4; j++) {
+      // Fill the column array with values from the block matrix
+      column[j] = block[(j * 4) + i];
+    }
+
+    // Apply the MixColumn operation on one column
+    mixColumn(column);
+
+    // Put the values back into the block matrix
+    for (int j = 0; j < 4; j++) {
+      // Update the block matrix with the modified column
+      block[(j * 4) + i] = column[j];
+    }
+  }
+}
+
+// Function to perform MixColumn operation on a single column
+void mixColumn(unsigned char *column) {
+  // Create a copy of the column
+  unsigned char cpy[4];
+  int i;
+  // Copy the values from the original column to the copy
+  for (i = 0; i < 4; i++) {
+    cpy[i] = column[i];
+  }
+  // Use Galois Field multiplication to perform the MixColumn operation
+  column[0] =
+      galois_multiplication(cpy[0], 2) ^ galois_multiplication(cpy[3], 1) ^
+      galois_multiplication(cpy[2], 1) ^ galois_multiplication(cpy[1], 3);
+
+  column[1] =
+      galois_multiplication(cpy[1], 2) ^ galois_multiplication(cpy[0], 1) ^
+      galois_multiplication(cpy[3], 1) ^ galois_multiplication(cpy[2], 3);
+
+  column[2] =
+      galois_multiplication(cpy[2], 2) ^ galois_multiplication(cpy[1], 1) ^
+      galois_multiplication(cpy[0], 1) ^ galois_multiplication(cpy[3], 3);
+
+  column[3] =
+      galois_multiplication(cpy[3], 2) ^ galois_multiplication(cpy[2], 1) ^
+      galois_multiplication(cpy[1], 1) ^ galois_multiplication(cpy[0], 3);
 }
 
 // Function to perform Galois Field (GF) multiplication
@@ -147,76 +209,85 @@ unsigned char galois_multiplication(unsigned char a, unsigned char b) {
   return p;
 }
 
-// Function to perform MixColumn operation on a single column
-void mixColumn(unsigned char *column) {
-  // Create a copy of the column
-  unsigned char cpy[4];
-  int i;
-  // Copy the values from the original column to the copy
-  for (i = 0; i < 4; i++) {
-    cpy[i] = column[i];
+/*
+ * Operations used when decrypting a block
+ */
+void invert_sub_bytes(unsigned char *block) {
+  // TODO: This function performs the inverse of the SubBytes transformation
+  // during decryption.
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    block[i] = r_sbox[block[i]];
   }
-  // Use Galois Field multiplication to perform the MixColumn operation
-  column[0] =
-      galois_multiplication(cpy[0], 2) ^ galois_multiplication(cpy[3], 1) ^
-      galois_multiplication(cpy[2], 1) ^ galois_multiplication(cpy[1], 3);
-
-  column[1] =
-      galois_multiplication(cpy[1], 2) ^ galois_multiplication(cpy[0], 1) ^
-      galois_multiplication(cpy[3], 1) ^ galois_multiplication(cpy[2], 3);
-
-  column[2] =
-      galois_multiplication(cpy[2], 2) ^ galois_multiplication(cpy[1], 1) ^
-      galois_multiplication(cpy[0], 1) ^ galois_multiplication(cpy[3], 3);
-
-  column[3] =
-      galois_multiplication(cpy[3], 2) ^ galois_multiplication(cpy[2], 1) ^
-      galois_multiplication(cpy[1], 1) ^ galois_multiplication(cpy[0], 3);
 }
 
-/* MixColumns operates on the columns of the block,
-   treating each column as a four-term polynomial and multiplying it
-   with a fixed polynomial modulo a predefined polynomial.
-*/
-void mix_columns(unsigned char *block) {
-  // TODO: This function performs the MixColumns
-  //       transformation during encryption.
-  int i, j;
+void invert_shift_rows(unsigned char *block) {
+  // TODO: undoes the row shifts performed in ShiftRows.
+  unsigned char temp_block[BLOCK_SIZE];
+
+  for (int i = 0; i < BLOCK_SIZE; i += 4) {
+    // incrementing by 5 causes the diagonal shift effect
+    temp_block[i] = block[i];
+    temp_block[(i + 5) % BLOCK_SIZE] = block[i + 1];
+    temp_block[(i + 10) % BLOCK_SIZE] = block[i + 2];
+    temp_block[(i + 15) % BLOCK_SIZE] = block[i + 3];
+  }
+
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    block[i] = temp_block[i];
+  }
+}
+
+// Declaration of invert_mix_column function
+void invert_mix_column(unsigned char *column);
+
+void invert_mix_columns(unsigned char *block) {
+  // TODO: undoes the column mixing performed in MixColumns.
   // Define an array to store one column of data
   unsigned char column[4];
 
-  // Iterate over the 4 columns of the state matrix
-  for (i = 0; i < 4; i++) {
+  // Iterate over the 4 columns of the block matrix
+  for (int i = 0; i < 4; i++) {
     // Construct one column by iterating over the 4 rows
-    for (j = 0; j < 4; j++) {
-      // Fill the column array with values from the state matrix
+    for (int j = 0; j < 4; j++) {
+      // Fill the column array with values from the block matrix
       column[j] = block[(j * 4) + i];
     }
 
-    // Apply the MixColumn operation on one column
-    mixColumn(column);
+    // Apply the InvertMixColumn operation on one column
+    invert_mix_column(column);
 
-    // Put the values back into the state matrix
-    for (j = 0; j < 4; j++) {
-      // Update the state matrix with the modified column
+    // Put the values back into the block matrix
+    for (int j = 0; j < 4; j++) {
+      // Update the block matrix with the modified column
       block[(j * 4) + i] = column[j];
     }
   }
 }
 
-/*
- * Operations used when decrypting a block
- */
-void invert_sub_bytes(unsigned char *block) {
-  // TODO: Implement me!
-}
+// Function to perform InvertMixColumn operation on a single column
+void invert_mix_column(unsigned char *column) {
+  // Create a copy of the column
+  unsigned char cpy[4];
+  // Copy the values from the original column to the copy
+  for (int i = 0; i < 4; i++) {
+    cpy[i] = column[i];
+  }
+  // Use Galois Field multiplication to perform the InvertMixColumn operation
+  column[0] =
+      galois_multiplication(cpy[0], 14) ^ galois_multiplication(cpy[3], 9) ^
+      galois_multiplication(cpy[2], 13) ^ galois_multiplication(cpy[1], 11);
 
-void invert_shift_rows(unsigned char *block) {
-  // TODO: Implement me!
-}
+  column[1] =
+      galois_multiplication(cpy[1], 14) ^ galois_multiplication(cpy[0], 9) ^
+      galois_multiplication(cpy[3], 13) ^ galois_multiplication(cpy[2], 11);
 
-void invert_mix_columns(unsigned char *block) {
-  // TODO: Implement me!
+  column[2] =
+      galois_multiplication(cpy[2], 14) ^ galois_multiplication(cpy[1], 9) ^
+      galois_multiplication(cpy[0], 13) ^ galois_multiplication(cpy[3], 11);
+
+  column[3] =
+      galois_multiplication(cpy[3], 14) ^ galois_multiplication(cpy[2], 9) ^
+      galois_multiplication(cpy[1], 13) ^ galois_multiplication(cpy[0], 11);
 }
 
 /*
@@ -241,6 +312,10 @@ void key_schedule_core(unsigned char *word, int iteration);
  */
 unsigned char *expand_key(unsigned char *cipher_key) {
   // TODO: Implementation of key expansion function
+  // 1.ExpandKey takes the original cipher key and
+  // generates a series of round keys using a key schedule algorithm.
+  // 2.These round keys are derived from the original key and are used
+  // in each round of encryption and decryption.
   if (cipher_key == NULL) {
     printf("Error: Cipher key is NULL.\n");
     return NULL;
