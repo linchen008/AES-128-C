@@ -7,6 +7,7 @@
 
 #include <stdlib.h>  // for malloc, free
 // TODO: Any other files you need to include should go here
+#include <stdio.h>
 #include <string.h>
 
 #include "rijndael.h"
@@ -291,7 +292,7 @@ void invert_mix_column(unsigned char *column) {
 }
 
 /*
- * This operation is shared between encryption and decryption
+ * This operation is shared between encryption and decryption.
  */
 void add_round_key(unsigned char *block, unsigned char *round_key) {
   // TODO: AddRoundKey XORs each byte of the block with the corresponding byte
@@ -382,9 +383,44 @@ void key_schedule_core(unsigned char *word, int iteration) {
  * header file should go here
  */
 unsigned char *aes_encrypt_block(unsigned char *plaintext, unsigned char *key) {
-  // TODO: Implement me!
+  // TODO: AES encryption on a single block of plaintext using the given key.
+
+  // Step 0: Expand the key
+  unsigned char *expanded_key =
+      expand_key(key);  // Expand the key using the key expansion function
+
+  // Step 1: Initial Round
+  add_round_key(plaintext, key);  // Add the initial round key to the plaintext
+
+  // Step 2: Main Rounds
+  for (int round = 1; round < NUM_ROUNDS; round++) {  // size:16, 10 rounds
+    sub_bytes(plaintext);
+    shift_rows(plaintext);
+    mix_columns(plaintext);
+    add_round_key(plaintext, expanded_key + round * BLOCK_SIZE);
+  }
+
+  // Step 3: Final Round (without MixColumns)
+  sub_bytes(plaintext);
+  shift_rows(plaintext);
+  add_round_key(plaintext, expanded_key + NUM_ROUNDS * BLOCK_SIZE);
+
+  // Free the memory allocated for expanded_key
+  free(expanded_key);
+
+  // Allocate memory for the output ciphertext
   unsigned char *output =
       (unsigned char *)malloc(sizeof(unsigned char) * BLOCK_SIZE);
+  if (output == NULL) {
+    // Handle memory allocation error
+    printf("Error: Memory allocation failed!\n");
+    return NULL;
+  }
+
+  // Copy the final ciphertext to the output buffer
+  memcpy(output, plaintext, BLOCK_SIZE);
+
+  // Return the output ciphertext
   return output;
 }
 
@@ -394,4 +430,53 @@ unsigned char *aes_decrypt_block(unsigned char *ciphertext,
   unsigned char *output =
       (unsigned char *)malloc(sizeof(unsigned char) * BLOCK_SIZE);
   return output;
+}
+
+int main() {
+  // Define your plaintext and key here
+  unsigned char plaintext[BLOCK_SIZE] = {'a', 'b', 'c', 'd', 'e', 'f',
+                                         '1', '2', '3', '4', '5', '6',
+                                         '7', '8', '9', '0'};
+
+  unsigned char key[BLOCK_SIZE] = {'k', 'k', 'k', 'k', 'e', 'e', 'e', 'e',
+                                   'y', 'y', 'y', 'y', '.', '.', '.', '.'};
+
+  printf("**************************************************\n");
+  printf("*   Basic implementation of AES-128 in C         *\n");
+  printf("**************************************************\n");
+
+  printf("\nCipher Key (HEX format):\n");
+  for (int i = 0; i < 16; i++) {
+    // Print characters in HEX format, 16 chars per line
+    printf("%2.2x%c", key[i], ((i + 1) % 16) ? ' ' : '\n');
+  }
+
+  // Test the Key Expansion
+  unsigned char *expanded_key = expand_key(key);
+  printf("\nExpanded Key (HEX format):\n");
+
+  for (int i = 0; i < EXPANDED_KEY_SIZE; i++) {
+    printf("%2.2x%c", expanded_key[i], ((i + 1) % 16) ? ' ' : '\n');
+  }
+  free(expanded_key);
+
+  printf("\nPlaintext (HEX format):\n");
+  for (int i = 0; i < 16; i++) {
+    printf("%2.2x%c", plaintext[i], ((i + 1) % 16) ? ' ' : '\n');
+  }
+
+  // Encrypt the plaintext using AES
+  unsigned char *ciphertext = aes_encrypt_block(plaintext, key);
+
+  // Print the encrypted ciphertext
+  printf("Encrypted Ciphertext:\n");
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    printf("%2.2x%c", ciphertext[i], ((i + 1) % 16) ? ' ' : '\n');
+  }
+  printf("\n");
+
+  // Free the memory allocated for ciphertext
+  free(ciphertext);
+
+  return 0;
 }
