@@ -38,8 +38,54 @@ int main() {
   printf("\n\n########### RECOVERED PLAINTEXT ###########\n");
   print_128bit_block(recovered_plaintext);
 
-  free(ciphertext);
+  // free(ciphertext);
+  // free(recovered_plaintext);
+
+  printf("\n\n##########################################################\n");
+
+  printf("\nCipher Key (HEX format):\n");
+  for (int i = 0; i < 16; i++) {
+    // Print characters in HEX format, 16 chars per line
+    printf("%2.2x%c", key[i], ((i + 1) % 16) ? ' ' : '\n');
+  }
+
+  // Test the Key Expansion
+  unsigned char *expanded_key = expand_key(key);
+  printf("\nExpanded Key (HEX format):\n");
+
+  for (int i = 0; i < EXPANDED_KEY_SIZE; i++) {
+    printf("%2.2x%c", expanded_key[i], ((i + 1) % 16) ? ' ' : '\n');
+  }
+
+  printf("\nPlaintext (HEX format):\n");
+  for (int i = 0; i < 16; i++) {
+    printf("%2.2x%c", plaintext[i], ((i + 1) % 16) ? ' ' : '\n');
+  }
+  printf("\n");
+
+  // Encrypt the plaintext using AES
+  // unsigned char *ciphertext = aes_encrypt_block(plaintext, key);
+
+  // Print the encrypted ciphertext
+  printf("Encrypted Ciphertext:\n");
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    printf("%2.2x%c", ciphertext[i], ((i + 1) % 16) ? ' ' : '\n');
+  }
+  printf("\n");
+
+  // Decrypt the plaintext using AES
+  // unsigned char *decryptedtext = aes_decrypt_block(ciphertext, key);
+  printf("\nDecrypted text (HEX format):\n");
+
+  for (int i = 0; i < 16; i++) {
+    printf("%2.2x%c", recovered_plaintext[i], ((i + 1) % 16) ? ' ' : '\n');
+  }
+  printf("\n");
+
+  // Free the memory allocated for decryptedtext
   free(recovered_plaintext);
+  free(ciphertext);
+  free(expanded_key);
 
   return 0;
 }
