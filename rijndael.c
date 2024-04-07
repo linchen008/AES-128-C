@@ -5,9 +5,10 @@
  * Number: D23125391
  */
 
+#include <stdio.h>
 #include <stdlib.h>  // for malloc, free
 // TODO: Any other files you need to include should go here
-#include <stdio.h>
+
 #include <string.h>
 
 #include "rijndael.h"
@@ -75,8 +76,11 @@ unsigned char r_sbox[256] = {
     0x55, 0x21, 0x0C, 0x7D};
 
 // Implementation: Round Constant
-unsigned char Rcon[10] = {0x8d, 0x01, 0x02, 0x04, 0x08,
-                          0x10, 0x20, 0x40, 0x80, 0x1b};
+unsigned char Rcon[32] = {
+    0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36,
+    0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97,
+    0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39,
+};
 
 /*
   Operations used when encrypting a block.
@@ -101,7 +105,7 @@ void shift_rows(unsigned char *block) {
   // TODO: This function performs the ShiftRows transformation during
   // encryption. Declare a temporary block to store intermediate results
   unsigned char temp_block[BLOCK_SIZE];
-  // Iterate over each row in the block
+  // Iterate over each column in the block
   for (int i = 0; i < BLOCK_SIZE; i += 4) {
     // Perform row shifting with diagonal effect
     // Shift the first byte in the row, no shift for the first column
@@ -120,10 +124,26 @@ void shift_rows(unsigned char *block) {
   }
 }
 
-// Declaration of galois_multiplication function
-unsigned char galois_multiplication(unsigned char a, unsigned char b);
-// Declaration of mixColumn function
-void mixColumn(unsigned char *column);
+// Function gmul implements multiplication in Galois Field (GF).
+unsigned char gmul(unsigned char rhs, unsigned char lhs) {
+  unsigned char peasant = 0;         // Store the final result
+  unsigned int irreducible = 0x11b;  // Irreducible polynomial used in GF(2^8)
+  // Use the peasant's algorithm for multiplication
+  while (lhs) {
+    if (lhs & 1) {              // If the lowest bit of the left-hand side is 1
+      peasant = peasant ^ rhs;  // Add rhs to the result
+    }
+    if (rhs & 0x80) {  // If the highest bit of rhs is 1
+      // Perform left shift and XOR with the irreducible polynomial
+      rhs = (rhs << 1) ^ irreducible;
+    } else {
+      rhs = rhs << 1;  // Otherwise, only perform left shift
+    }
+    lhs = lhs >> 1;  // Right shift the left-hand side by 1
+  }
+  return peasant;
+}
+
 /* MixColumns operates on the columns of the block,
    treating each column as a four-term polynomial and multiplying it
    with a fixed polynomial modulo a predefined polynomial.
@@ -132,82 +152,26 @@ void mix_columns(unsigned char *block) {
   // TODO: This function performs the MixColumns
   //       transformation during encryption.
 
-  // Define an array to store one column of data
-  unsigned char column[4];
-
-  // Iterate over the 4 columns of the block matrix
-  for (int i = 0; i < 4; i++) {
-    // Construct one column by iterating over the 4 rows
-    for (int j = 0; j < 4; j++) {
-      // Fill the column array with values from the block matrix
-      column[j] = block[(j * 4) + i];
-    }
-
-    // Apply the MixColumn operation on one column
-    mixColumn(column);
-
-    // Put the values back into the block matrix
-    for (int j = 0; j < 4; j++) {
-      // Update the block matrix with the modified column
-      block[(j * 4) + i] = column[j];
-    }
+  // Array to store the temporary result
+  unsigned char temp_block[BLOCK_SIZE];
+  for (int i = 0; i < BLOCK_SIZE; i += 4) {
+    // Apply the MixColumns transformation to each column
+    // Each column has a length of 4, so the loop has a step of 4
+    temp_block[i] = gmul(block[i], (unsigned char)2) ^
+                    gmul(block[i + 1], (unsigned char)3) ^ block[i + 2] ^
+                    block[i + 3];
+    temp_block[i + 1] = block[i] ^ gmul(block[i + 1], (unsigned char)2) ^
+                        gmul(block[i + 2], (unsigned char)3) ^ block[i + 3];
+    temp_block[i + 2] = block[i] ^ block[i + 1] ^
+                        gmul(block[i + 2], (unsigned char)2) ^
+                        gmul(block[i + 3], (unsigned char)3);
+    temp_block[i + 3] = gmul(block[i], (unsigned char)3) ^ block[i + 1] ^
+                        block[i + 2] ^ gmul(block[i + 3], (unsigned char)2);
   }
-}
-
-// Function to perform MixColumn operation on a single column
-void mixColumn(unsigned char *column) {
-  // Create a copy of the column
-  unsigned char cpy[4];
-  int i;
-  // Copy the values from the original column to the copy
-  for (i = 0; i < 4; i++) {
-    cpy[i] = column[i];
+  // Copy the computed result back to the original array
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    block[i] = temp_block[i];
   }
-  // Use Galois Field multiplication to perform the MixColumn operation
-  column[0] =
-      galois_multiplication(cpy[0], 2) ^ galois_multiplication(cpy[3], 1) ^
-      galois_multiplication(cpy[2], 1) ^ galois_multiplication(cpy[1], 3);
-
-  column[1] =
-      galois_multiplication(cpy[1], 2) ^ galois_multiplication(cpy[0], 1) ^
-      galois_multiplication(cpy[3], 1) ^ galois_multiplication(cpy[2], 3);
-
-  column[2] =
-      galois_multiplication(cpy[2], 2) ^ galois_multiplication(cpy[1], 1) ^
-      galois_multiplication(cpy[0], 1) ^ galois_multiplication(cpy[3], 3);
-
-  column[3] =
-      galois_multiplication(cpy[3], 2) ^ galois_multiplication(cpy[2], 1) ^
-      galois_multiplication(cpy[1], 1) ^ galois_multiplication(cpy[0], 3);
-}
-
-// Function to perform Galois Field (GF) multiplication
-unsigned char galois_multiplication(unsigned char a, unsigned char b) {
-  // Initialize the product to 0
-  unsigned char p = 0;
-  // Counter to iterate over the bits of 'b'
-  unsigned char counter;
-  // Variable to store the highest bit of 'a'
-  unsigned char hi_bit_set;
-  // Loop through 8 bits (1 byte)
-  for (counter = 0; counter < 8; counter++) {
-    // if the least significant bit of 'b' is 1
-    if ((b & 1) == 1)
-      // XOR the product with 'a'
-      p ^= a;
-    // if the most significant bit of 'a' is 1
-    hi_bit_set = (a & 0x80);
-    // Left shift 'a' by 1 bit
-    a <<= 1;
-    // If the most significant bit of 'a' was 1
-    if (hi_bit_set == 0x80)
-      // XOR 'a' with the irreducible polynomial 0x1b
-      a ^= 0x1b;
-    // Right shift 'b' by 1 bit
-    b >>= 1;
-  }
-  // Return the product
-  return p;
 }
 
 /*
@@ -232,63 +196,40 @@ void invert_shift_rows(unsigned char *block) {
     temp_block[(i + 10) % BLOCK_SIZE] = block[i + 2];
     temp_block[(i + 15) % BLOCK_SIZE] = block[i + 3];
   }
-
   for (int i = 0; i < BLOCK_SIZE; i++) {
     block[i] = temp_block[i];
   }
 }
 
-// Declaration of invert_mix_column function
-void invert_mix_column(unsigned char *column);
-
 void invert_mix_columns(unsigned char *block) {
-  // TODO: undoes the column mixing performed in MixColumns.
-  // Define an array to store one column of data
-  unsigned char column[4];
+  unsigned char temp_block[BLOCK_SIZE];
 
-  // Iterate over the 4 columns of the block matrix
-  for (int i = 0; i < 4; i++) {
-    // Construct one column by iterating over the 4 rows
-    for (int j = 0; j < 4; j++) {
-      // Fill the column array with values from the block matrix
-      column[j] = block[(j * 4) + i];
-    }
+  for (int i = 0; i < BLOCK_SIZE; i += 4) {
+    // inverse multiplication > 9,11,13,14
+    temp_block[i] = gmul(block[i], (unsigned char)14) ^
+                    gmul(block[i + 1], (unsigned char)11) ^
+                    gmul(block[i + 2], (unsigned char)13) ^
+                    gmul(block[i + 3], (unsigned char)9);
 
-    // Apply the InvertMixColumn operation on one column
-    invert_mix_column(column);
+    temp_block[i + 1] = gmul(block[i], (unsigned char)9) ^
+                        gmul(block[i + 1], (unsigned char)14) ^
+                        gmul(block[i + 2], (unsigned char)11) ^
+                        gmul(block[i + 3], (unsigned char)13);
 
-    // Put the values back into the block matrix
-    for (int j = 0; j < 4; j++) {
-      // Update the block matrix with the modified column
-      block[(j * 4) + i] = column[j];
-    }
+    temp_block[i + 2] = gmul(block[i], (unsigned char)13) ^
+                        gmul(block[i + 1], (unsigned char)9) ^
+                        gmul(block[i + 2], (unsigned char)14) ^
+                        gmul(block[i + 3], (unsigned char)11);
+
+    temp_block[i + 3] = gmul(block[i], (unsigned char)11) ^
+                        gmul(block[i + 1], (unsigned char)13) ^
+                        gmul(block[i + 2], (unsigned char)9) ^
+                        gmul(block[i + 3], (unsigned char)14);
   }
-}
 
-// Function to perform InvertMixColumn operation on a single column
-void invert_mix_column(unsigned char *column) {
-  // Create a copy of the column
-  unsigned char cpy[4];
-  // Copy the values from the original column to the copy
-  for (int i = 0; i < 4; i++) {
-    cpy[i] = column[i];
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    block[i] = temp_block[i];
   }
-  // Use Galois Field multiplication to perform the InvertMixColumn operation
-  column[0] =
-      galois_multiplication(cpy[0], 14) ^ galois_multiplication(cpy[3], 9) ^
-      galois_multiplication(cpy[2], 13) ^ galois_multiplication(cpy[1], 11);
-
-  column[1] =
-      galois_multiplication(cpy[1], 14) ^ galois_multiplication(cpy[0], 9) ^
-      galois_multiplication(cpy[3], 13) ^ galois_multiplication(cpy[2], 11);
-
-  column[2] =
-      galois_multiplication(cpy[2], 14) ^ galois_multiplication(cpy[1], 9) ^
-      galois_multiplication(cpy[0], 13) ^ galois_multiplication(cpy[3], 11);
-
-  column[3] =
-      galois_multiplication(cpy[3], 14) ^ galois_multiplication(cpy[2], 9) ^
-      galois_multiplication(cpy[1], 13) ^ galois_multiplication(cpy[0], 11);
 }
 
 /*
@@ -305,7 +246,6 @@ void add_round_key(unsigned char *block, unsigned char *round_key) {
 
 // Declaration of key schedule core function
 void key_schedule_core(unsigned char *word, int iteration);
-
 /*
  * This function should expand the round key. Given an input,
  * which is a single 128-bit key, it should return a 176-byte
@@ -375,7 +315,6 @@ void key_schedule_core(unsigned char *word, int iteration) {
   }
 
   // Apply round constant
-  // word[0] ^= Rcon[iteration - 1];
   word[0] ^= Rcon[iteration];
 }
 
@@ -472,71 +411,3 @@ unsigned char *aes_decrypt_block(unsigned char *ciphertext,
   // Return the output plaintext
   return output;
 }
-
-// int main() {
-//   unsigned char plaintext[16] = {1, 2,  3,  4,  5,  6,  7,  8,
-//                                  9, 10, 11, 12, 13, 14, 15, 16};
-//   unsigned char key[16] = {50, 20, 46, 86, 67, 9, 70, 27,
-//                            75, 17, 51, 17, 4,  8, 6,  99};
-
-//   unsigned char *ciphertext = aes_encrypt_block(plaintext, key);
-//   unsigned char *recovered_plaintext = aes_decrypt_block(ciphertext, key);
-
-//   printf("############ ORIGINAL PLAINTEXT ###########\n");
-//   print_128bit_block(plaintext);
-
-//   printf("\n\n################ CIPHERTEXT ###############\n");
-//   print_128bit_block(ciphertext);
-
-//   printf("\n\n########### RECOVERED PLAINTEXT ###########\n");
-//   print_128bit_block(recovered_plaintext);
-
-//   free(ciphertext);
-//   free(recovered_plaintext);
-
-//   printf("\n\n##########################################################\n");
-
-//   printf("\nCipher Key (HEX format):\n");
-//   for (int i = 0; i < 16; i++) {
-//     // Print characters in HEX format, 16 chars per line
-//     printf("%2.2x%c", key[i], ((i + 1) % 16) ? ' ' : '\n');
-//   }
-
-//   // Test the Key Expansion
-//   unsigned char *expanded_key = expand_key(key);
-//   printf("\nExpanded Key (HEX format):\n");
-
-//   for (int i = 0; i < EXPANDED_KEY_SIZE; i++) {
-//     printf("%2.2x%c", expanded_key[i], ((i + 1) % 16) ? ' ' : '\n');
-//   }
-
-//   printf("\nPlaintext (HEX format):\n");
-//   for (int i = 0; i < 16; i++) {
-//     printf("%2.2x%c", plaintext[i], ((i + 1) % 16) ? ' ' : '\n');
-//   }
-
-//   // Encrypt the plaintext using AES
-//   unsigned char *ciphertext1 = aes_encrypt_block(plaintext, key);
-
-//   // Print the encrypted ciphertext
-//   printf("Encrypted Ciphertext:\n");
-//   for (int i = 0; i < BLOCK_SIZE; i++) {
-//     printf("%2.2x%c", ciphertext1[i], ((i + 1) % 16) ? ' ' : '\n');
-//   }
-//   printf("\n");
-
-//   // Decrypt the plaintext using AES
-//   unsigned char *decryptedtext = aes_decrypt_block(ciphertext, key);
-//   printf("\nDecrypted text (HEX format):\n");
-
-//   for (int i = 0; i < 16; i++) {
-//     printf("%2.2x%c", decryptedtext[i], ((i + 1) % 16) ? ' ' : '\n');
-//   }
-
-//   // Free the memory allocated for decryptedtext
-//   free(decryptedtext);
-//   free(ciphertext);
-//   free(expanded_key);
-
-//   return 0;
-// }
