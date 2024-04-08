@@ -6,6 +6,8 @@ jobs:
     steps:
       - name: Clone the repo
         uses: actions/checkout@v4
+        with:
+          submodules: true
       - name: Build the code
         run: |
           sudo apt install -y build-essential python-is-python3
@@ -14,4 +16,3 @@ jobs:
         run: |
           pip install pytest
           pytest pyTestC.py || exit 1
-      
