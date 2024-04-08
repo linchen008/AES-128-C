@@ -14,5 +14,4 @@ jobs:
           make
       - name: Run unit test
         run: |
-          pip install pytest
-          pytest pyTestC.py || exit 1
+          python3 py_c_test.py || exit 1
