@@ -10,8 +10,8 @@ jobs:
         run: |
           sudo apt install -y build-essential python-is-python3
           make
-      - name: Run Unit test with pyTestC
+      - name: Run unit test
         run: |
           pip install pytest
-          pytest tests.py || exit 1
+          pytest pyTestC.py || exit 1
       
